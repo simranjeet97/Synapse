@@ -1,0 +1,51 @@
+[project]
+name = "production-rag-system"
+version = "0.1.0"
+description = "A production-ready RAG system with advanced retrieval, agents, and security."
+authors = [{ name = "Antigravity", email = "antigravity@google.com" }]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "chromadb",
+    "redis[hiredis]",
+    "sentence-transformers",
+    "rank-bm25",
+    "google-generativeai",
+    "langchain",
+    "tiktoken",
+    "presidio-analyzer",
+    "spacy",
+    "datasketch",
+    "pdfplumber",
+    "pytesseract",
+    "python-docx",
+    "beautifulsoup4",
+    "chardet",
+    "opik",
+    "python-multipart",
+    "aiofiles",
+    "httpx",
+    "pydantic-settings",
+    "python-magic",
+    "tabulate",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "black",
+    "isort",
+    "mypy",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app", "routes", "services", "retrieval", "agents", "pipeline", "security", "prompts"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
