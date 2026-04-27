@@ -1,34 +1,23 @@
 version: '3.8'
 
 services:
-  api:
-    build:
-      context: .
-      dockerfile: app/Dockerfile
-    environment:
-      - REDIS_URL=redis://redis:6379
-    ports:
-      - "8000:8000"
-    depends_on:
-      - redis
+  app:
     deploy:
       resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  redis:
-    image: redis/redis-stack-server:latest
-    command: redis-server --appendonly yes
+        limits:
+          cpus: '4'
+          memory: 8G
     volumes:
-      - redis_storage:/data
+      - chroma_vol_0:/app/chroma_db/shards_0_3
+      - chroma_vol_1:/app/chroma_db/shards_4_7
+      - chroma_vol_2:/app/chroma_db/shards_8_11
+      - chroma_vol_3:/app/chroma_db/shards_12_15
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=info
 
 volumes:
-  redis_storage:
+  chroma_vol_0:
+  chroma_vol_1:
+  chroma_vol_2:
+  chroma_vol_3:

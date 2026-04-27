@@ -3,18 +3,37 @@ import asyncio
 import redis.asyncio as redis
 import pickle
 import os
-from typing import List, Optional
+import time
+from typing import List, Optional, Dict, Any
 from app.config import settings
 from app.models import RetrievedDoc, FilterParams, SearchResult
+from retrieval.chroma_shard_manager import shard_manager
 from pipeline.embedder import embedder
 
 class ChromaHybridRetriever:
     def __init__(self):
-        persist_directory = os.path.join(os.getcwd(), "chroma_db")
-        self.chroma_client = chromadb.PersistentClient(path=persist_directory)
-            
-        self.collection = self.chroma_client.get_or_create_collection(name=settings.CHROMA_COLLECTION_NAME)
         self.redis = redis.from_url(settings.REDIS_URL)
+        self.last_shard_stats = {}
+
+    async def _query_shard(self, shard_id: int, query_vec: List[float], limit: int, where: dict, filters: Optional[FilterParams]) -> Dict[str, Any]:
+        start_time = time.time()
+        collection = shard_manager.get_collection(shard_id)
+        
+        # We need to run collection.query in a thread since it's blocking
+        loop = asyncio.get_event_loop()
+        results = await loop.run_in_executor(None, lambda: collection.query(
+            query_embeddings=[query_vec],
+            n_results=limit,
+            where=where,
+            include=["documents", "metadatas", "distances"]
+        ))
+        
+        latency = (time.time() - start_time) * 1000
+        return {
+            "shard_id": shard_id,
+            "results": results,
+            "latency": latency
+        }
 
     async def _dense_search(self, query_vec: List[float], limit: int, filters: Optional[FilterParams]) -> List[SearchResult]:
         where = {}
@@ -34,34 +53,53 @@ class ChromaHybridRetriever:
             elif len(conditions) == 1:
                 where = conditions[0]
         
-        results = self.collection.query(
-            query_embeddings=[query_vec],
-            n_results=limit, # Get more if we need to post-filter entities
-            where=where,
-            include=["documents", "metadatas", "distances"]
-        )
-        
-        docs = []
-        if results["ids"] and len(results["ids"]) > 0:
-            for i in range(len(results["ids"][0])):
-                metadata = results["metadatas"][0][i]
-                
-                # Post-retrieval filtering for entities
-                # Since 'entities' is stored as a string "Entity1,Entity2"
-                if filters and filters.entity_names:
-                    doc_entities = metadata.get("entities", "").split(",")
-                    doc_entities = [e.strip() for e in doc_entities if e.strip()]
-                    # Check if any requested entity is in the document
-                    if not any(e in doc_entities for e in filters.entity_names):
-                        continue
+        # Determine which shards to query
+        if filters and filters.document_id:
+            shard_id = await shard_manager.get_shard_for_doc(filters.document_id)
+            target_shards = [shard_id]
+        else:
+            target_shards = list(range(settings.NUM_SHARDS))
 
-                docs.append(SearchResult(
-                    id=results["ids"][0][i],
-                    content=results["documents"][0][i],
-                    metadata=metadata,
-                    score=1.0 - results["distances"][0][i]
-                ))
-        return docs
+        # Parallel fan-out
+        shard_tasks = [self._query_shard(sid, query_vec, 20, where, filters) for sid in target_shards]
+        shard_responses = await asyncio.gather(*shard_tasks)
+        
+        all_docs = []
+        shard_stats = {}
+        
+        for resp in shard_responses:
+            sid = resp["shard_id"]
+            results = resp["results"]
+            latency = resp["latency"]
+            
+            hits = 0
+            if results["ids"] and len(results["ids"]) > 0:
+                for i in range(len(results["ids"][0])):
+                    metadata = results["metadatas"][0][i]
+                    
+                    # Post-retrieval filtering for entities
+                    # Since 'entities' is stored as a string "Entity1,Entity2"
+                    if filters and filters.entity_names:
+                        doc_entities = metadata.get("entities", "").split(",")
+                        doc_entities = [e.strip() for e in doc_entities if e.strip()]
+                        # Check if any requested entity is in the document
+                        if not any(e in doc_entities for e in filters.entity_names):
+                            continue
+
+                    hits += 1
+                    metadata["shard_id"] = sid
+                    all_docs.append(SearchResult(
+                        id=results["ids"][0][i],
+                        content=results["documents"][0][i],
+                        metadata=metadata,
+                        score=1.0 - results["distances"][0][i]
+                    ))
+            
+            shard_stats[sid] = {"hits": hits, "latency_ms": latency}
+            
+        # Store shard stats in a way that can be retrieved later if needed
+        self.last_shard_stats = shard_stats
+        return all_docs
 
     async def _sparse_search(self, query: str, limit: int) -> List[SearchResult]:
         try:
@@ -125,6 +163,7 @@ class ChromaHybridRetriever:
                 id=doc_id,
                 content=res.content,
                 metadata=res.metadata,
+                score=getattr(res, 'score', 0.0),
                 dense_score=getattr(res, 'score', 0.0),
                 bm25_score=0.0, # Placeholder
                 rrf_score=scores[doc_id]

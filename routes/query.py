@@ -30,6 +30,7 @@ class RAGStreamer:
         self.cache_hit = False
         self.crag_path = "normal"
         self.sources = []
+        self.shard_stats = {}
         genai.configure(api_key=settings.GOOGLE_API_KEY)
         self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
 
@@ -94,6 +95,7 @@ class RAGStreamer:
         query_vec = await embedder.embed_text(rewritten_query)
         results = await content_filter.validate_results(query_vec, ranked_results)
         
+        self.shard_stats = hybrid_retriever.last_shard_stats
         self._end_step("retrieval_rerank")
 
         # 6. CRAG Agent
@@ -144,7 +146,8 @@ class RAGStreamer:
             latencies=self.latencies,
             model=settings.GEMINI_MODEL,
             cache_hit=self.cache_hit,
-            crag_path=self.crag_path
+            crag_path=self.crag_path,
+            shard_stats=self.shard_stats
         )
         final_res = FinalQueryResponse(
             token="",

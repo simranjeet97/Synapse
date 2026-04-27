@@ -9,6 +9,8 @@ class Settings(BaseSettings):
 
     # Infrastructure
     CHROMA_COLLECTION_NAME: str = "production-rag"
+    CHROMA_PERSIST_DIRECTORY: str = "chroma_db"
+    NUM_SHARDS: int = 16
     REDIS_URL: str = "redis://localhost:6379"
     
     # AI Services

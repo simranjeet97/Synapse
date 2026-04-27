@@ -66,6 +66,7 @@ class PipelineTrace(BaseModel):
     model: str
     cache_hit: bool
     crag_path: str
+    shard_stats: Optional[Dict[str, Any]] = None
 
 class FinalQueryResponse(BaseModel):
     token: str = ""

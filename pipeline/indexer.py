@@ -7,17 +7,11 @@ from datetime import datetime
 import spacy
 import os
 
+from retrieval.chroma_shard_manager import shard_manager
+import asyncio
+
 class ChromaIndexer:
     def __init__(self):
-        # Use local persistence only
-        persist_directory = os.path.join(os.getcwd(), "chroma_db")
-        self.client = chromadb.PersistentClient(path=persist_directory)
-        print(f"Chroma: Using local persistent storage at {persist_directory}")
-
-        self.collection = self.client.get_or_create_collection(
-            name=settings.CHROMA_COLLECTION_NAME,
-            metadata={"hnsw:space": "cosine"}
-        )
         self.nlp = spacy.load("en_core_web_sm")
 
     def _extract_entities(self, text: str) -> List[str]:
@@ -27,31 +21,53 @@ class ChromaIndexer:
     async def upsert_chunks(self, chunks: List[Chunk]):
         await self.index_chunks(chunks)
 
-    async def index_chunks(self, chunks: List[Chunk]):
-        if not chunks:
-            return
-            
-        ids = [c.id for c in chunks]
-        documents = [c.content for c in chunks]
-        embeddings = [c.embedding for c in chunks]
+    async def _upsert_to_shard(self, shard_id: int, shard_chunks: List[Chunk]):
+        collection = shard_manager.get_collection(shard_id)
+        
+        ids = [c.id for c in shard_chunks]
+        documents = [c.content for c in shard_chunks]
+        embeddings = [c.embedding for c in shard_chunks]
         metadatas = []
 
-        for c in chunks:
+        for c in shard_chunks:
             meta = c.metadata.model_dump()
-            # Convert datetime to string for Chroma
             for k, v in meta.items():
                 if isinstance(v, datetime):
                     meta[k] = v.isoformat()
             
             meta["entities"] = ",".join(self._extract_entities(c.content))
+            meta["shard_id"] = shard_id
             metadatas.append(meta)
 
-        self.collection.upsert(
+        # Chroma upsert is blocking, run in executor
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: collection.upsert(
             ids=ids,
             embeddings=embeddings,
             documents=documents,
             metadatas=metadatas
-        )
-        print(f"Chroma: Indexed {len(chunks)} chunks into collection {settings.CHROMA_COLLECTION_NAME}")
+        ))
+        
+        # Register in Redis
+        for c in shard_chunks:
+            await shard_manager.register_doc_shard(c.id, shard_id)
+            
+        print(f"ChromaIndexer: Indexed {len(shard_chunks)} chunks into shard {shard_id}")
+
+    async def index_chunks(self, chunks: List[Chunk]):
+        if not chunks:
+            return
+            
+        # Group chunks by shard_id
+        shard_groups = {}
+        for c in chunks:
+            sid = shard_manager.get_shard_id(c.id)
+            if sid not in shard_groups:
+                shard_groups[sid] = []
+            shard_groups[sid].append(c)
+            
+        # Parallel upserts
+        tasks = [self._upsert_to_shard(sid, grouped_chunks) for sid, grouped_chunks in shard_groups.items()]
+        await asyncio.gather(*tasks)
 
 indexer = ChromaIndexer()

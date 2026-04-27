@@ -11,6 +11,7 @@ class FilterParams(BaseModel):
     date_lte: Optional[str] = None
     source_type: Optional[str] = None # e.g., 'pdf', 'web', 'doc'
     entity_names: Optional[List[str]] = None
+    document_id: Optional[str] = None
 
     @field_validator('date_gte', 'date_lte')
     @classmethod

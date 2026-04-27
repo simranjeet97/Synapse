@@ -5,7 +5,11 @@ from app.config import settings
 
 router = APIRouter()
 
-@router.get("/")
+from services.shard_health import shard_health_service
+
+@router.get("/shards")
+async def shard_health():
+    return await shard_health_service.get_shards_status()
 async def health_check():
     health_status = {
         "status": "healthy",

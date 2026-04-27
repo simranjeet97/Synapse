@@ -9,7 +9,9 @@ async def lifespan(app: FastAPI):
     # Startup logic (e.g., connect to Qdrant, Redis)
     print(f"Starting {settings.PROJECT_NAME}...")
     from services.semantic_cache import semantic_cache
+    from retrieval.chroma_shard_manager import shard_manager
     await semantic_cache.init_index()
+    await shard_manager.initialize_shards()
     yield
     # Shutdown logic
     print(f"Shutting down {settings.PROJECT_NAME}...")
