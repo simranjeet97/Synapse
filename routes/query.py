@@ -75,9 +75,25 @@ class RAGStreamer:
         # 5. Retrieval & Reranking
         self._start_step()
         raw_results = await hybrid_retriever.search(rewritten_query, limit=route_config["top_k"], filters=self.request.filters)
-        # For now, keeping reranker but Gemini is used for main generation
-        # If user wants ONLY Gemini, we'd implement a Gemini reranker
-        results = await cohere_reranker.rerank(rewritten_query, raw_results, top_n=5)
+        
+        # Convert RetrievedDoc to SearchResult for the reranker if needed
+        # (Actually, search returns RetrievedDoc, but reranker expects SearchResult)
+        search_results_for_rank = [
+            SearchResult(
+                id=doc.id,
+                content=doc.content,
+                metadata=doc.metadata,
+                score=doc.dense_score
+            ) for doc in raw_results
+        ]
+        
+        ranked_results = await cohere_reranker.rerank(rewritten_query, search_results_for_rank, top_n=5)
+        
+        # 5b. Content Filtering (Source, Toxicity, Relevance)
+        from pipeline.embedder import embedder
+        query_vec = await embedder.embed_text(rewritten_query)
+        results = await content_filter.validate_results(query_vec, ranked_results)
+        
         self._end_step("retrieval_rerank")
 
         # 6. CRAG Agent
@@ -89,7 +105,8 @@ class RAGStreamer:
              yield f"data: {json.dumps({'token': agent_res.message, 'done': True})}\n\n"
              return
              
-        self.sources = agent_res.sources
+        self.sources = agent_res.documents
+        self.crag_path = agent_res.path
 
         # 7. Build Prompt
         self._start_step()

@@ -10,15 +10,8 @@ from pipeline.embedder import embedder
 
 class ChromaHybridRetriever:
     def __init__(self):
-        try:
-            self.chroma_client = chromadb.HttpClient(
-                host=settings.CHROMA_HOST,
-                port=settings.CHROMA_PORT
-            )
-            self.chroma_client.heartbeat()
-        except Exception:
-            persist_directory = os.path.join(os.getcwd(), "chroma_db")
-            self.chroma_client = chromadb.PersistentClient(path=persist_directory)
+        persist_directory = os.path.join(os.getcwd(), "chroma_db")
+        self.chroma_client = chromadb.PersistentClient(path=persist_directory)
             
         self.collection = self.chroma_client.get_or_create_collection(name=settings.CHROMA_COLLECTION_NAME)
         self.redis = redis.from_url(settings.REDIS_URL)
@@ -26,23 +19,46 @@ class ChromaHybridRetriever:
     async def _dense_search(self, query_vec: List[float], limit: int, filters: Optional[FilterParams]) -> List[SearchResult]:
         where = {}
         if filters:
+            conditions = []
             if filters.source_type:
-                where["source_type"] = filters.source_type
+                conditions.append({"source_type": filters.source_type})
+            
+            # Date range filtering (assuming metadata 'date' is ISO string)
+            if filters.date_gte:
+                conditions.append({"date": {"$gte": filters.date_gte}})
+            if filters.date_lte:
+                conditions.append({"date": {"$lte": filters.date_lte}})
+                
+            if len(conditions) > 1:
+                where = {"$and": conditions}
+            elif len(conditions) == 1:
+                where = conditions[0]
         
         results = self.collection.query(
             query_embeddings=[query_vec],
-            n_results=limit,
+            n_results=limit, # Get more if we need to post-filter entities
             where=where,
             include=["documents", "metadatas", "distances"]
         )
         
         docs = []
-        if results["ids"]:
+        if results["ids"] and len(results["ids"]) > 0:
             for i in range(len(results["ids"][0])):
+                metadata = results["metadatas"][0][i]
+                
+                # Post-retrieval filtering for entities
+                # Since 'entities' is stored as a string "Entity1,Entity2"
+                if filters and filters.entity_names:
+                    doc_entities = metadata.get("entities", "").split(",")
+                    doc_entities = [e.strip() for e in doc_entities if e.strip()]
+                    # Check if any requested entity is in the document
+                    if not any(e in doc_entities for e in filters.entity_names):
+                        continue
+
                 docs.append(SearchResult(
                     id=results["ids"][0][i],
                     content=results["documents"][0][i],
-                    metadata=results["metadatas"][0][i],
+                    metadata=metadata,
                     score=1.0 - results["distances"][0][i]
                 ))
         return docs
@@ -53,8 +69,8 @@ class ChromaHybridRetriever:
             if not bm25_data:
                 return []
             
-            # Data is pickled as (bm25, metadata)
-            bm25, metadatas = pickle.loads(bm25_data)
+            # Data is pickled as (bm25, list_of_dicts_with_content_and_metadata)
+            bm25, doc_data = pickle.loads(bm25_data)
             tokenized_query = query.lower().split()
             scores = bm25.get_scores(tokenized_query)
             
@@ -65,12 +81,10 @@ class ChromaHybridRetriever:
             results = []
             for i in top_indices:
                 if scores[i] > 0:
-                    # In a real system, we'd fetch the actual doc content. 
-                    # For this skeleton, we assume metadatas[i] has what we need or we return a placeholder.
-                    # Usually BM25 stores the doc content or we fetch from DB.
                     results.append(SearchResult(
-                        content=f"BM25 Result {i}", # Placeholder as content is not in BM25 index normally
-                        metadata=metadatas[i],
+                        id=f"sparse_{i}",
+                        content=doc_data[i]["content"],
+                        metadata=doc_data[i]["metadata"],
                         score=float(scores[i])
                     ))
             return results

@@ -8,8 +8,6 @@ class Settings(BaseSettings):
     DEBUG: bool = False
 
     # Infrastructure
-    CHROMA_HOST: str = "localhost"
-    CHROMA_PORT: int = 8000
     CHROMA_COLLECTION_NAME: str = "production-rag"
     REDIS_URL: str = "redis://localhost:6379"
     

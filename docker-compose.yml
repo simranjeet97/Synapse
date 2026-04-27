@@ -1,17 +1,6 @@
 version: '3.8'
 
 services:
-  chroma:
-    image: chromadb/chroma:latest
-    ports:
-      - "8000:8000"
-    volumes:
-      - chroma_data:/chroma/data
-    environment:
-      - ALLOW_RESET=TRUE
-      - IS_PERSISTENT=TRUE
-    restart: always
-
   redis:
     image: redis/redis-stack:latest
     ports:
@@ -22,5 +11,5 @@ services:
     restart: always
 
 volumes:
-  chroma_data:
+
   redis_data:

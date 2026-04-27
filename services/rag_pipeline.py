@@ -38,15 +38,44 @@ class RAGPipeline:
         route_config = await adaptive_router.classify_and_route(rewritten_query)
         
         # 5. Retrieval
-        results = await hybrid_retriever.search(
+        raw_results = await hybrid_retriever.search(
             rewritten_query, 
             limit=route_config["top_k"], 
             filters=filters
         )
         
+        # 5b. Content Filtering (Source, Toxicity, Relevance)
+        from pipeline.embedder import embedder
+        query_vec = await embedder.embed_text(rewritten_query)
+        
+        # Convert RetrievedDoc to SearchResult for the filter if necessary, 
+        # but RetrievedDoc has content, metadata, and score (dense_score).
+        # We'll map them to SearchResult objects for the filter.
+        search_results = [
+            SearchResult(
+                id=doc.id,
+                content=doc.content,
+                metadata=doc.metadata,
+                score=doc.dense_score
+            ) for doc in raw_results
+        ]
+        
+        filtered_results = await content_filter.validate_results(query_vec, search_results)
+        
+        # Convert back to RetrievedDoc for CRAG
+        final_docs = [
+            RetrievedDoc(
+                id=res.id,
+                content=res.content,
+                metadata=res.metadata,
+                dense_score=res.score,
+                rrf_score=0.0 # Placeholder
+            ) for res in filtered_results
+        ]
+
         # 6. CRAG (Corrective RAG) Agent
         # This handles grading, web search fallback, and generation
-        agent_res = await crag_agent.run(rewritten_query, results, conv_id)
+        agent_res = await crag_agent.run(rewritten_query, final_docs, conv_id)
         
         if isinstance(agent_res, RefusalResponse):
             return agent_res

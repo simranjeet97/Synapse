@@ -14,7 +14,7 @@ import { toast } from "sonner";
 export default function SettingsPage() {
   const [chunkSize, setChunkSize] = useState([512]);
   const [topK, setTopK] = useState([5]);
-  const [model, setModel] = useState("gpt-4o");
+  const [model, setModel] = useState("gemini-3-flash");
 
   const handleSave = () => {
     toast.success("Settings saved successfully");
@@ -46,8 +46,8 @@ export default function SettingsPage() {
                <Label>Primary Model</Label>
                <Tabs value={model} onValueChange={setModel} className="w-full">
                  <TabsList className="grid w-full grid-cols-2">
-                   <TabsTrigger value="gpt-4o">GPT-4o</TabsTrigger>
-                   <TabsTrigger value="gpt-4o-mini">GPT-4o-Mini</TabsTrigger>
+                   <TabsTrigger value="gemini-3-flash">Gemini 3 Flash</TabsTrigger>
+                   <TabsTrigger value="gemini-3-pro">Gemini 3 Pro</TabsTrigger>
                  </TabsList>
                </Tabs>
              </div>
@@ -140,4 +140,3 @@ export default function SettingsPage() {
     </div>
   );
 }
- Greenland = """

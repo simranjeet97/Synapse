@@ -29,12 +29,14 @@ async def test_input_guard_injection():
 
 @pytest.mark.asyncio
 async def test_content_filter_allowlist():
+    from security.content_filter import ContentFilter
+    # Use a custom filter instance to test allowlist logic
+    test_filter = ContentFilter(allowlist=["trusted-source.org"])
     results = [
         SearchResult(content="Safe content", metadata={"source": "trusted-source.org"}, score=0.9),
         SearchResult(content="Untrusted content", metadata={"source": "hacker-site.com"}, score=0.9)
     ]
-    # Default allowlist includes trusted-source.org
-    filtered = await content_filter.validate_results(query_vector=[], results=results)
+    filtered = await test_filter.validate_results(query_vector=[], results=results)
     assert len(filtered) == 1
     assert filtered[0].metadata["source"] == "trusted-source.org"
 

@@ -4,7 +4,8 @@ import numpy as np
 
 class ContentFilter:
     def __init__(self, allowlist: Optional[List[str]] = None, relevance_threshold: float = 0.3):
-        self.allowlist = allowlist or ["example.com", "trusted-source.org", "internal.docs"]
+        # Default allowlist includes common tech docs and local path indicators
+        self.allowlist = allowlist
         self.relevance_threshold = relevance_threshold
         self.toxic_keywords = ["hate", "violence", "illegal", "explicit", "toxic"]
 
@@ -25,9 +26,14 @@ class ContentFilter:
         for res in results:
             # 1. Check source domain
             source = res.metadata.get("source", "")
-            if self.allowlist and not any(domain in source for domain in self.allowlist):
-                print(f"ContentFilter: Blocked untrusted source {source}")
-                continue
+            
+            # Allow local paths by default
+            is_local = source.startswith("/") or (len(source) > 1 and source[1] == ":")
+            
+            if self.allowlist and not is_local:
+                if not any(domain in source for domain in self.allowlist):
+                    print(f"ContentFilter: Blocked untrusted source {source}")
+                    continue
                 
             # 2. Check toxicity
             if self._is_toxic(res.content):

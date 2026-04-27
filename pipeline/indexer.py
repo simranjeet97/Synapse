@@ -9,20 +9,10 @@ import os
 
 class ChromaIndexer:
     def __init__(self):
-        try:
-            # Try HTTP first
-            self.client = chromadb.HttpClient(
-                host=settings.CHROMA_HOST,
-                port=settings.CHROMA_PORT
-            )
-            # Ping to check connection
-            self.client.heartbeat()
-            print("Chroma: Connected to HTTP server")
-        except Exception:
-            # Fallback to local persistence
-            persist_directory = os.path.join(os.getcwd(), "chroma_db")
-            self.client = chromadb.PersistentClient(path=persist_directory)
-            print(f"Chroma: Using local persistent storage at {persist_directory}")
+        # Use local persistence only
+        persist_directory = os.path.join(os.getcwd(), "chroma_db")
+        self.client = chromadb.PersistentClient(path=persist_directory)
+        print(f"Chroma: Using local persistent storage at {persist_directory}")
 
         self.collection = self.client.get_or_create_collection(
             name=settings.CHROMA_COLLECTION_NAME,

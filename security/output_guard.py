@@ -31,7 +31,9 @@ class OutputGuard:
         
         for res in results:
             entity_types.add(res.entity_type)
-            placeholder = f"[REDACTED_{res.entity_type.replace('_ADDRESS', '').replace('NUMBER', '').replace('US_', '')}]"
+            # Clean up the entity type for the placeholder
+            clean_type = res.entity_type.replace('_ADDRESS', '').replace('NUMBER', '').replace('US_', '').strip('_')
+            placeholder = f"[REDACTED_{clean_type}]"
             redacted_text = redacted_text[:res.start] + placeholder + redacted_text[res.end:]
             
         return redacted_text, list(entity_types)

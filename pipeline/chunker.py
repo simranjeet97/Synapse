@@ -17,8 +17,8 @@ class Chunker:
         if file_ext == ".py":
             try:
                 return self._split_python_code(text)
-            except:
-                pass # Fallback to recursive splitting
+            except Exception as e:
+                print(f"Chunker AST parsing failed: {e}. Falling back to recursive splitting.")
                 
         return self._recursive_split(text, self.separators)
 

@@ -36,8 +36,8 @@ class ConversationMemory:
                 await self.redis.zadd(key, {message.model_dump_json(): message.timestamp.timestamp()})
                 await self.redis.zremrangebyrank(key, 0, -11) # Keep last 10
                 await self.redis.expire(key, 3600)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"ConversationMemory add_message error: {e}")
         
         if session_id not in self.local_mem:
             self.local_mem[session_id] = []
@@ -50,8 +50,8 @@ class ConversationMemory:
                 key = f"conv:{session_id}"
                 data = await self.redis.zrange(key, -last_n, -1)
                 return [Message(**json.loads(m)) for m in data]
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"ConversationMemory get_context error: {e}")
         
         return self.local_mem.get(session_id, [])[-last_n:]
 

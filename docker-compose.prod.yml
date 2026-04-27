@@ -6,13 +6,10 @@ services:
       context: .
       dockerfile: app/Dockerfile
     environment:
-      - CHROMA_HOST=chroma
-      - CHROMA_PORT=8000
       - REDIS_URL=redis://redis:6379
     ports:
       - "8000:8000"
     depends_on:
-      - chroma
       - redis
     deploy:
       resources:
@@ -27,21 +24,11 @@ services:
       timeout: 10s
       retries: 3
 
-  chroma:
-    image: chromadb/chroma:latest
-    volumes:
-      - chroma_data:/chroma/data
-    ports:
-      - "8001:8000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
-
   redis:
-    image: redis:alpine
+    image: redis/redis-stack-server:latest
     command: redis-server --appendonly yes
     volumes:
       - redis_storage:/data
 
 volumes:
-  chroma_data:
   redis_storage:

@@ -56,6 +56,11 @@ class AgentResponse(BaseModel):
 class RefusalResponse(BaseModel):
     message: str = "I could not find reliable information to answer this question."
 
+class CRAGResult(BaseModel):
+    documents: List[SearchResult]
+    path: str # 'correct' | 'ambiguous' | 'incorrect'
+    reason: Optional[str] = None
+
 class PipelineTrace(BaseModel):
     latencies: Dict[str, float]
     model: str
