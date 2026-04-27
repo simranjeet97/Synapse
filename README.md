@@ -213,9 +213,9 @@ Tech: rebel-large · Neo4j · spaCy NER · agents/graph_reasoner.py
 ```
 
 #### Community Summarization (Microsoft GraphRAG style)
-Cluster the knowledge graph into topic communities using the Louvain algorithm. For each community of ≥5 nodes, generate a GPT-4o summary. Store summaries as high-level chunks. For broad thematic queries, retrieve community summaries first, then drill into specific evidence chunks — enabling global + local reasoning in a single pass.
+Cluster the knowledge graph into topic communities using the Louvain algorithm. For each community of ≥5 nodes, generate a Gemini 3 summary. Store summaries as high-level chunks. For broad thematic queries, retrieve community summaries first, then drill into specific evidence chunks — enabling global + local reasoning in a single pass.
 ```
-Tech: Louvain clustering · GPT-4o community summaries · hierarchical retrieval · python-louvain
+Tech: Louvain clustering · Gemini 3 community summaries · hierarchical retrieval · python-louvain
 ```
 
 #### Multi-Hop Reasoning Agent
@@ -267,9 +267,9 @@ Tech: QuickUMLS · scispaCy · UMLS CUI mapping · query synonym expansion
 ```
 
 #### PICO Framework Extraction
-Parse clinical documents using the PICO framework (Population, Intervention, Comparison, Outcome). A GPT-4o extractor with few-shot prompts outputs structured PICO JSON per study. PICO fields are stored as Qdrant payload for structured queries: *"Find RCTs on [population] treated with [intervention] showing [outcome]"*.
+Parse clinical documents using the PICO framework (Population, Intervention, Comparison, Outcome). A Gemini 3 extractor with few-shot prompts outputs structured PICO JSON per study. PICO fields are stored as Qdrant payload for structured queries: *"Find RCTs on [population] treated with [intervention] showing [outcome]"*.
 ```
-Tech: PICO extractor · few-shot GPT-4o · structured payload · clinical NLP
+Tech: PICO extractor · few-shot Gemini 3 · structured payload · clinical NLP
 ```
 
 #### Drug Interaction Knowledge Graph
@@ -317,9 +317,9 @@ Tech: feedback store · failure clustering · reranker fine-tuning · DPO traini
 ### 🖼️ Multimodal — Beyond Text
 
 #### Chart & Figure Understanding
-For every figure in a PDF: (1) extract with pdfplumber, (2) send to GPT-4o Vision to generate a structured description and extract data points as JSON, (3) index the description as a chunk with `figure_type` and `source_page` metadata. Tables are extracted as markdown and indexed as structured chunks — unlocking the 40–60% of information in documents that is purely visual.
+For every figure in a PDF: (1) extract with pdfplumber, (2) send to Gemini 3 Vision to generate a structured description and extract data points as JSON, (3) index the description as a chunk with `figure_type` and `source_page` metadata. Tables are extracted as markdown and indexed as structured chunks — unlocking the 40–60% of information in documents that is purely visual.
 ```
-Tech: GPT-4o Vision · pdfplumber figure extraction · table markdown · multimodal chunking
+Tech: Gemini 3 Vision · pdfplumber figure extraction · table markdown · multimodal chunking
 ```
 
 #### Audio & Video Transcription
