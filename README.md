@@ -2,13 +2,47 @@
 
 > **Enterprise Agentic RAG — Built for Scale, Accuracy, and Trust**
 
-An enterprise-grade, high-performance Retrieval-Augmented Generation monorepo powered by **Google Gemini 3**. Synapse features advanced agentic workflows, self-healing retrieval, knowledge graph reasoning, and multi-layer security — designed to handle millions of documents with citation-accurate answers.
+An enterprise-grade, high-performance Retrieval-Augmented Generation monorepo powered by **Google Gemini 3**. Synapse features advanced agentic workflows, self-healing retrieval, and multi-layer security — designed to handle millions of documents with citation-accurate answers.
 
 ![Architecture](https://img.shields.io/badge/Architecture-Agentic--RAG-blueviolet)
-![Model](https://img.shields.io/badge/Model-Gemini--3--Flash--Preview-orange)
+![Model](https://img.shields.io/badge/Model-Gemini--3--Flash-orange)
 ![Backend](https://img.shields.io/badge/Backend-FastAPI-green)
 ![Frontend](https://img.shields.io/badge/Frontend-Next.js%2015-black)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
+---
+
+## 🏗️ System Architecture
+
+```mermaid
+graph TD
+    User([User]) --> InputGuard[Input Guard: Security Check]
+    InputGuard --> Rewriter[Query Rewriter: Context Awareness]
+    Rewriter --> Cache{Semantic Cache?}
+    
+    Cache -- Hit --> OutputGuard
+    Cache -- Miss --> Router[Adaptive Router: Intent Classify]
+    
+    Router --> Retrieval[Hybrid Retrieval: Dense + Sparse]
+    Retrieval --> Filter[Content Filter: Domain & Relevance]
+    Filter --> CRAG[CRAG Agent: Grade & Correct]
+    
+    CRAG -- Missing Knowledge --> WebSearch[Tavily Web Search]
+    WebSearch --> Generation
+    CRAG -- Valid Knowledge --> Generation[Gemini 3: Generation]
+    
+    Generation --> OutputGuard[Output Guard: PII Redaction]
+    OutputGuard --> User
+    
+    subgraph Infrastructure
+        Chroma[(ChromaDB: Vectors)]
+        Redis[(Redis: Cache & BM25)]
+    end
+    
+    Retrieval -.-> Chroma
+    Retrieval -.-> Redis
+    Cache -.-> Redis
+```
 
 ---
 
@@ -40,7 +74,7 @@ An enterprise-grade, high-performance Retrieval-Augmented Generation monorepo po
 | Layer | Technology |
 |---|---|
 | Core | Python 3.10+, FastAPI, Next.js 15, TypeScript |
-| AI | Google Gemini 3 Flash Preview, LangChain, Sentence-Transformers |
+| AI | Google Gemini 3 (Flash & Pro), LangChain, Sentence-Transformers |
 | Vector DB | ChromaDB (dev) → Qdrant cluster (prod) |
 | Cache / Memory | Redis + RediSearch |
 | UI | Tailwind CSS, shadcn/ui, Framer Motion |
@@ -91,7 +125,7 @@ docker-compose up -d
 python -m venv venv
 source venv/bin/activate
 pip install -e .
-uvicorn app.main:app --reload
+uvicorn app.main:app --port 8005 --reload
 ```
 
 **Frontend:**
@@ -110,7 +144,25 @@ npm run dev
 | `/api/v1/query` | `POST` | SSE streaming query with full agentic pipeline |
 | `/api/v1/search` | `GET` | Retrieval debug — raw scores across all stages |
 | `/api/v1/ingest` | `POST` | Upload and index a document |
-| `/api/v1/health` | `GET` | Service health + dependency status |
+| `/health/` | `GET` | Service health + dependency status |
+
+---
+
+## 🧪 How to Test
+
+### 1. Backend Health
+Verify the infrastructure is up and running:
+```bash
+curl http://localhost:8005/health/
+```
+
+### 2. End-to-End RAG Test
+1. Open [http://localhost:3000](http://localhost:3000).
+2. Go to the **Upload** page and index a document.
+3. Go to the **Chat** page and ask a question about that document.
+4. Go to **Settings** to toggle security guards or switch between **Gemini 3 Flash** and **Gemini 3 Pro**.
+
+---
 
 ---
 
