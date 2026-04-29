@@ -35,6 +35,8 @@ app.add_middleware(
 app.include_router(health.router, prefix="/health", tags=["Health"])
 app.include_router(query.router, prefix=settings.API_V1_STR + "/query", tags=["Query"])
 app.include_router(search.router, prefix=settings.API_V1_STR + "/search", tags=["Search"])
+from routes import ingest
+app.include_router(ingest.router, prefix=settings.API_V1_STR + "/ingest", tags=["Ingest"])
 
 @app.get("/")
 async def root():

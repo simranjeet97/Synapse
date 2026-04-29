@@ -10,6 +10,15 @@ class DocumentMetadata(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     source_type: str # 'pdf' | 'web' | 'doc'
     
+from typing import List, Optional, Dict, Any, Literal
+
+class CitationEdge(BaseModel):
+    source_doc_id: str
+    target_doc_id: str
+    citation_type: Literal['hyperlink', 'crossref', 'footnote']
+    weight: float
+    raw_text: str
+
 class Chunk(BaseModel):
     id: str
     content: str
@@ -21,6 +30,7 @@ class QueryRequest(BaseModel):
     session_id: str = Field(..., description="Unique ID for the conversation session")
     filters: Optional[FilterParams] = None
     stream: bool = Field(True)
+    use_sharding: bool = Field(False)
 
 class SearchResult(BaseModel):
     content: str
@@ -31,7 +41,9 @@ class SearchResult(BaseModel):
 class RetrievedDoc(SearchResult):
     dense_score: Optional[float] = 0.0
     bm25_score: Optional[float] = 0.0
-    rrf_score: float = 0.0
+    rrf_score: Optional[float] = 0.0
+    pagerank_score: Optional[float] = 0.0
+    boosted_score: Optional[float] = 0.0
 
 class Message(BaseModel):
     role: str

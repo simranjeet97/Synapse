@@ -34,6 +34,13 @@ class ChromaShardManager:
             )
         return self.shards[shard_id]
 
+    def get_enterprise_collection(self) -> chromadb.Collection:
+        """Returns the non-sharded enterprise collection."""
+        return self.client.get_or_create_collection(
+            name="synapse_enterprise",
+            metadata={"hnsw:space": "cosine"}
+        )
+
     async def initialize_shards(self):
         """Initialize all shards on startup."""
         for i in range(self.num_shards):

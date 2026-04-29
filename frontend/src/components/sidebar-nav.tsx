@@ -6,9 +6,11 @@ import { cn } from "@/lib/utils";
 import { MessageSquare, Upload, Search, Settings, Bot, Terminal } from "lucide-react";
 
 const navItems = [
-  { icon: MessageSquare, label: "Chat", href: "/chat" },
-  { icon: Upload, label: "Upload", href: "/upload" },
+  { icon: MessageSquare, label: "Enterprise RAG", href: "/chat" },
+  { icon: Bot, label: "Multi-Tenant Sharding", href: "/sharding" },
   { icon: Search, label: "Debugger", href: "/search" },
+  { icon: Terminal, label: "PageRank", href: "/pagerank" },
+  { icon: Upload, label: "Upload", href: "/upload" },
   { icon: Settings, label: "Settings", href: "/settings" },
 ];
 

@@ -28,6 +28,10 @@ dependencies = [
     "pydantic-settings",
     "python-magic",
     "tabulate",
+    "networkx",
+    "celery",
+    "scipy",
+    "numpy",
 ]
 
 [project.optional-dependencies]

@@ -4,6 +4,7 @@ import redis.asyncio as redis
 import pickle
 import os
 import time
+import math
 from typing import List, Optional, Dict, Any
 from app.config import settings
 from app.models import RetrievedDoc, FilterParams, SearchResult
@@ -35,7 +36,7 @@ class ChromaHybridRetriever:
             "latency": latency
         }
 
-    async def _dense_search(self, query_vec: List[float], limit: int, filters: Optional[FilterParams]) -> List[SearchResult]:
+    async def _dense_search(self, query_vec: List[float], limit: int, filters: Optional[FilterParams], use_sharding: bool = True) -> List[SearchResult]:
         where = {}
         if filters:
             conditions = []
@@ -53,7 +54,29 @@ class ChromaHybridRetriever:
             elif len(conditions) == 1:
                 where = conditions[0]
         
-        # Determine which shards to query
+        if not use_sharding:
+            # Query the single enterprise collection
+            collection = shard_manager.get_enterprise_collection()
+            loop = asyncio.get_event_loop()
+            results = await loop.run_in_executor(None, lambda: collection.query(
+                query_embeddings=[query_vec],
+                n_results=limit,
+                where=where,
+                include=["documents", "metadatas", "distances"]
+            ))
+            
+            all_docs = []
+            if results["ids"] and len(results["ids"]) > 0:
+                for i in range(len(results["ids"][0])):
+                    all_docs.append(SearchResult(
+                        id=results["ids"][0][i],
+                        content=results["documents"][0][i],
+                        metadata=results["metadatas"][0][i],
+                        score=1.0 - results["distances"][0][i]
+                    ))
+            return all_docs
+
+        # Determine which shards to query (Original Sharding Logic)
         if filters and filters.document_id:
             shard_id = await shard_manager.get_shard_for_doc(filters.document_id)
             target_shards = [shard_id]
@@ -130,11 +153,11 @@ class ChromaHybridRetriever:
             print(f"Sparse search error: {e}")
             return []
 
-    async def search(self, query: str, limit: int = 10, filters: Optional[FilterParams] = None) -> List[RetrievedDoc]:
+    async def search(self, query: str, limit: int = 10, filters: Optional[FilterParams] = None, use_sharding: bool = True) -> List[RetrievedDoc]:
         query_vec = await embedder.embed_text(query)
         
         # Get results from both
-        dense_results = await self._dense_search(query_vec, limit=50, filters=filters)
+        dense_results = await self._dense_search(query_vec, limit=50, filters=filters, use_sharding=use_sharding)
         sparse_results = await self._sparse_search(query, limit=50)
         
         # RRF Merging
@@ -156,19 +179,36 @@ class ChromaHybridRetriever:
         # Sort by RRF score
         sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
         
+        # PageRank Boosting
+        alpha = settings.PAGERANK_ALPHA
+        if filters and filters.authority_mode:
+            alpha *= 2.0 # Step 5: Increase alpha to 0.6 if authority_mode is True
+            
         fused_results = []
-        for doc_id in sorted_ids[:limit]:
+        for doc_id in sorted_ids[:20]: # Step 1: Process top-20 candidates
             res = docs[doc_id]
+            # Step 1 & 6: Fetch pagerank_score from metadata, default to 0.05 for cold-start
+            pr_score = res.metadata.get("pagerank_score", 0.05)
+            rrf_score = scores[doc_id]
+            
+            # Step 2: Compute boosted score
+            boosted_score = rrf_score * (1 + alpha * math.log(1 + pr_score))
+            
             fused_results.append(RetrievedDoc(
                 id=doc_id,
                 content=res.content,
                 metadata=res.metadata,
-                score=getattr(res, 'score', 0.0),
+                score=boosted_score,
                 dense_score=getattr(res, 'score', 0.0),
-                bm25_score=0.0, # Placeholder
-                rrf_score=scores[doc_id]
+                bm25_score=0.0,
+                rrf_score=rrf_score,
+                pagerank_score=pr_score,
+                boosted_score=boosted_score
             ))
             
-        return fused_results
+        # Step 3: Re-sort by boosted_score
+        fused_results.sort(key=lambda x: x.boosted_score, reverse=True)
+        
+        return fused_results[:limit]
 
 hybrid_retriever = ChromaHybridRetriever()

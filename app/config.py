@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     OPIK_API_KEY: Optional[str] = None
     OPIK_HOST: str = "http://localhost:8080"
     OPIK_PROJECT_NAME: str = "production-rag"
+    
+    # RAG Tuning
+    PAGERANK_ALPHA: float = 0.3
+    COHERE_API_KEY: Optional[str] = None
 
     # Security
     ALLOWED_HOSTS: list[str] = ["*"]

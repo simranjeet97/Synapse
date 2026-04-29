@@ -20,6 +20,7 @@ interface UploadFile {
 
 export default function UploadPage() {
   const [files, setFiles] = useState<UploadFile[]>([]);
+  const [selectedSystem, setSelectedSystem] = useState<"enterprise" | "sharding">("enterprise");
 
   const onDrop = (acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map(file => ({
@@ -59,7 +60,7 @@ export default function UploadPage() {
       await new Promise(r => setTimeout(r, 1000));
       updateStatus("embedding", 80);
       
-      const res = await api.upload(fileObj.file);
+      const res = await api.upload(fileObj.file, selectedSystem === "sharding");
       updateStatus("indexed", 100);
       toast.success(`${fileObj.file.name} indexed successfully`);
     } catch (error) {
@@ -79,6 +80,27 @@ export default function UploadPage() {
         <p className="text-muted-foreground">
           Upload PDF, DOCX, HTML, or Images to build your knowledge base.
         </p>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex gap-4">
+          <Button 
+            variant={selectedSystem === "enterprise" ? "default" : "outline"}
+            className="flex-1 h-16 rounded-2xl flex flex-col items-center justify-center gap-1"
+            onClick={() => setSelectedSystem("enterprise")}
+          >
+            <span className="font-bold">Enterprise RAG</span>
+            <span className="text-[10px] opacity-70">Single Collection</span>
+          </Button>
+          <Button 
+            variant={selectedSystem === "sharding" ? "default" : "outline"}
+            className="flex-1 h-16 rounded-2xl flex flex-col items-center justify-center gap-1"
+            onClick={() => setSelectedSystem("sharding")}
+          >
+            <span className="font-bold">Multi-Tenant Sharding</span>
+            <span className="text-[10px] opacity-70">16x Chroma Shards</span>
+          </Button>
+        </div>
       </div>
 
       <div 

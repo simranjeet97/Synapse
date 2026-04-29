@@ -75,7 +75,12 @@ class RAGStreamer:
 
         # 5. Retrieval & Reranking
         self._start_step()
-        raw_results = await hybrid_retriever.search(rewritten_query, limit=route_config["top_k"], filters=self.request.filters)
+        raw_results = await hybrid_retriever.search(
+            rewritten_query, 
+            limit=route_config["top_k"], 
+            filters=self.request.filters,
+            use_sharding=self.request.use_sharding
+        )
         
         # Convert RetrievedDoc to SearchResult for the reranker if needed
         # (Actually, search returns RetrievedDoc, but reranker expects SearchResult)

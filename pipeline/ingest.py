@@ -17,7 +17,7 @@ class IngestionPipeline:
     def __init__(self):
         self.mime = magic.Magic(mime=True)
 
-    async def process_file(self, file_path: str):
+    async def process_file(self, file_path: str, use_sharding: bool = True):
         print(f"Starting ingestion for: {file_path}")
         
         # 1. Detect MIME Type
@@ -54,6 +54,11 @@ class IngestionPipeline:
         chunk_texts = chunker.split_text(full_content, file_ext=ext)
         print(f"Split into {len(chunk_texts)} chunks.")
         
+        # 5b. Citation Graph Extraction
+        from .citation_extractor import citation_extractor
+        edges = citation_extractor.extract(file_path, full_content, {"file_path": file_path})
+        await citation_extractor.store_edges(edges)
+        
         # 6. Embed (Dense)
         vectors = embedder.embed_batches(chunk_texts)
         
@@ -73,7 +78,16 @@ class IngestionPipeline:
                 metadata=doc_metadata
             ))
             
-        await indexer.upsert_chunks(chunks)
+        await indexer.upsert_chunks(chunks, use_sharding=use_sharding)
+        
+        # 7b. Store chunk mapping in Redis for PageRank job
+        import redis
+        from app.config import settings
+        r = redis.from_url(settings.REDIS_URL)
+        chunk_ids = [c.id for c in chunks]
+        if chunk_ids:
+            r.sadd(f"doc_chunks:{file_path}", *chunk_ids)
+            r.expire(f"doc_chunks:{file_path}", 604800) # 1 week TTL
         
         # 8. Update BM25 Index (Redis)
         embedder.build_bm25_index(chunk_texts, [doc_metadata.model_dump() for _ in chunk_texts])
