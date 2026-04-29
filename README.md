@@ -84,6 +84,8 @@ graph TD
 
 ### ⚡ Performance & Scale
 - **Hybrid Retrieval**: Combined Dense (HNSW) and Sparse (BM25) search fused with Reciprocal Rank Fusion (RRF)
+- **PageRank Authority Boosting**: Offline graph-based scoring (networkx) integrated into retrieval via a dampened log-boost formula.
+- **Authority Mode**: Query-time ranking override to prioritize highly-cited authoritative documents.
 - **Semantic Cache**: Sub-millisecond similarity caching via RediSearch vector indexing
 - **Context Awareness**: Redis-backed conversation memory with intelligent query rewriting for multi-turn dialogues
 
@@ -94,7 +96,7 @@ graph TD
 
 ### 📊 Observability
 - **Opik Integration**: Full pipeline tracing with latency metrics and model traces at every step
-- **Retrieval Debugger**: Dedicated UI for inspecting raw scores across Dense, Sparse, and RRF stages
+- **Retrieval Debugger**: Dedicated UI for inspecting raw scores across Dense, Sparse, RRF, and PageRank stages, including real-time visualization of authority boosting.
 
 ---
 
@@ -221,11 +223,8 @@ Before embedding a query, prompt Gemini to generate a short hypothetical "ideal 
 Tech: Gemini Flash · dual embedding · vector averaging · services/hyde.py
 ```
 
-#### PageRank-Weighted Retrieval
-During ingestion, extract hyperlinks and cross-document citations to build a citation graph. Run PageRank (networkx) offline. Store `pagerank_score` in Qdrant payload and multiply it into the final RRF score at query time — boosting authoritative sources without any change to the retrieval architecture.
-```
-Tech: networkx PageRank · link extraction · offline graph job · Qdrant payload scoring
-```
+#### PageRank-Weighted Authority Pipeline [COMPLETED]
+Implemented a document authority system using the PageRank algorithm. During ingestion, a `CitationExtractor` captures hyperlinks and cross-references into a Redis graph. A scheduled job (Celery) computes weighted PageRank scores, normalizes them, and persists them into ChromaDB payloads. Retrieval is enhanced with a dampened log-boost formula: `boosted_score = rrf * (1 + alpha * log(1 + pr))`. Includes an "Authority Mode" toggle for high-credibility requirements.
 
 ---
 
