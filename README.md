@@ -94,7 +94,7 @@ graph TD
         Query[User Query] --> Hybrid[Hybrid Search]
         Hybrid --> RRF[RRF Fusion Score]
         RRF --> FetchMeta[Fetch PageRank Metadata]
-        FetchMeta --> Boost[Boost Formula: rrf * (1 + alpha * log(1 + pr))]
+        FetchMeta --> Boost["Boost Formula: rrf * (1 + alpha * log(1 + pr))"]
         Boost --> Ranked[Final Ranked Results]
     end
 ```
