@@ -107,6 +107,7 @@ graph TD
 - **Corrective RAG (CRAG)**: Self-correcting retrieval loop that grades document relevance and triggers Tavily web search fallback for missing information
 - **Adaptive Router**: Zero-shot query classification to dynamically adjust retrieval parameters (Top-K, prompting strategy) based on user intent
 - **Query Decomposition**: Automatically breaks complex, multi-hop questions into precise sub-queries for higher recall
+- **Forced Reasoning Mode**: Toggleable agentic substrate available across all architectures (Enterprise, Sharding, PageRank) to force multi-hop decomposition and graph reasoning.
 
 ### ⚡ Performance & Scale
 - **Hybrid Retrieval**: Combined Dense (HNSW) and Sparse (BM25) search fused with Reciprocal Rank Fusion (RRF)
@@ -123,6 +124,7 @@ graph TD
 ### 📊 Observability
 - **Opik Integration**: Full pipeline tracing with latency metrics and model traces at every step
 - **Retrieval Debugger**: Dedicated UI for inspecting raw scores across Dense, Sparse, RRF, and PageRank stages, including real-time visualization of authority boosting.
+- **Agentic Comparison**: Comparative benchmarking in the Debugger to measure retrieval performance with and without Multi-Hop Reasoning enabled.
 
 ---
 
