@@ -72,6 +72,32 @@ graph TD
     end
 ```
 
+### 📈 PageRank Authority Architecture
+
+Synapse leverages a global citation graph to inject objective authority scores into the vector search pipeline, overcoming the limitations of pure semantic similarity.
+
+```mermaid
+graph TD
+    subgraph "Global Graph Construction"
+        Doc[Document Ingestion] --> Extract[Citation/Link Extractor]
+        Extract --> RedisGraph[(Redis: Citation Edges)]
+    end
+
+    subgraph "Authority Computation (Async)"
+        RedisGraph --> Celery[Celery: PageRank Job]
+        Celery --> Nx[NetworkX DiGraph Math]
+        Nx --> Norm[Normalize Scores 0.0 - 1.0]
+        Norm --> UpdateChroma[(ChromaDB: Metadata Update)]
+    end
+
+    subgraph "Boosted Retrieval Flow"
+        Query[User Query] --> Hybrid[Hybrid Search]
+        Hybrid --> RRF[RRF Fusion Score]
+        RRF --> FetchMeta[Fetch PageRank Metadata]
+        FetchMeta --> Boost[Boost Formula: rrf * (1 + alpha * log(1 + pr))]
+        Boost --> Ranked[Final Ranked Results]
+    end
+```
 
 ---
 
@@ -195,8 +221,6 @@ curl http://localhost:8005/health/
 
 ---
 
----
-
 ## 🔭 Future Work
 
 Synapse is architected for extension. The roadmap below covers the full spectrum of production capabilities — from million-document scale to domain-specific intelligence for legal and medical corpora.
@@ -207,9 +231,8 @@ Synapse is architected for extension. The roadmap below covers the full spectrum
 
 The base system is designed to grow. These upgrades unlock true enterprise scale.
 
-#### Distributed Multi-Tenant Sharding [COMPLETED]
+#### ✅ Distributed Multi-Tenant Sharding [COMPLETED]
 Implemented a consistent hashing layer using MD5 to partition documents across 16 ChromaDB shards. Optimized with Redis-backed O(1) shard lookup for targeted routing and parallel fan-out retrieval with RRF merging.
-
 
 #### Async Ingestion Queue
 Replace synchronous ingestion with a Celery + Redis Streams task queue. Priority lanes handle urgent documents (contracts, alerts) separately from bulk archive ingestion. Kubernetes HPA auto-scales worker pods based on queue depth. A dead-letter queue with retry + alerting handles extraction failures.
@@ -223,7 +246,7 @@ Before embedding a query, prompt Gemini to generate a short hypothetical "ideal 
 Tech: Gemini Flash · dual embedding · vector averaging · services/hyde.py
 ```
 
-#### PageRank-Weighted Authority Pipeline [COMPLETED]
+#### ✅ PageRank-Weighted Authority Pipeline [COMPLETED]
 Implemented a document authority system using the PageRank algorithm. During ingestion, a `CitationExtractor` captures hyperlinks and cross-references into a Redis graph. A scheduled job (Celery) computes weighted PageRank scores, normalizes them, and persists them into ChromaDB payloads. Retrieval is enhanced with a dampened log-boost formula: `boosted_score = rrf * (1 + alpha * log(1 + pr))`. Includes an "Authority Mode" toggle for high-credibility requirements.
 
 ---
