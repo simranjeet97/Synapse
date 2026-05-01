@@ -7,7 +7,9 @@ import { SearchResult } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, Info, Building2, Layers, Network } from "lucide-react";
+import { Search, Loader2, Info, Building2, Layers, Network, BrainCircuit } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 function SearchPageContent() {
   const searchParams = useSearchParams();
@@ -16,6 +18,8 @@ function SearchPageContent() {
   const [query, setQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [useReasoning, setUseReasoning] = useState(false);
+  const [decomposedQueries, setDecomposedQueries] = useState<string[]>([]);
   
   const [results, setResults] = useState<{
     enterprise: SearchResult[];
@@ -47,10 +51,14 @@ function SearchPageContent() {
       };
 
       const [ent, shard, pr] = await Promise.all([
-        measure(api.search(q, 5, false, { authority_mode: false })),
-        measure(api.search(q, 5, true, { authority_mode: false })),
-        measure(api.search(q, 5, false, { authority_mode: true }))
+        measure(api.search(q, 5, false, { authority_mode: false, use_reasoning: useReasoning })),
+        measure(api.search(q, 5, true, { authority_mode: false, use_reasoning: useReasoning })),
+        measure(api.search(q, 5, false, { authority_mode: true, use_reasoning: useReasoning }))
       ]);
+
+      if (ent.result.decomposed_queries) {
+        setDecomposedQueries(ent.result.decomposed_queries);
+      }
 
       setResults({
         enterprise: ent.result.results,
@@ -120,6 +128,28 @@ function SearchPageContent() {
           Run Comparison
         </Button>
       </div>
+
+      <div className="flex items-center gap-2 bg-primary/5 p-3 rounded-xl border border-primary/10 w-fit">
+        <BrainCircuit className="w-4 h-4 text-primary" />
+        <Label htmlFor="reasoning-mode" className="text-sm font-medium">Multi-Hop Reasoning</Label>
+        <Switch 
+          id="reasoning-mode" 
+          checked={useReasoning} 
+          onCheckedChange={setUseReasoning} 
+        />
+        <span className="text-[10px] text-muted-foreground ml-2">Engages LLM to decompose complex queries</span>
+      </div>
+
+      {decomposedQueries.length > 0 && hasSearched && useReasoning && (
+        <div className="flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+          <span className="text-xs font-medium text-muted-foreground py-1">Agent Thought:</span>
+          {decomposedQueries.map((dq, i) => (
+            <Badge key={i} variant="secondary" className="text-[10px] bg-primary/10 text-primary hover:bg-primary/20 border-primary/20">
+              {dq}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       {!hasSearched ? (
         <div className="h-64 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-3xl">

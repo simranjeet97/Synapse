@@ -31,6 +31,7 @@ class QueryRequest(BaseModel):
     filters: Optional[FilterParams] = None
     stream: bool = Field(True)
     use_sharding: bool = Field(False)
+    use_reasoning: bool = Field(False)
 
 class SearchResult(BaseModel):
     content: str

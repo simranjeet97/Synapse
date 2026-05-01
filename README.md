@@ -267,7 +267,7 @@ Cluster the knowledge graph into topic communities using the Louvain algorithm. 
 Tech: Louvain clustering · Gemini 3 community summaries · hierarchical retrieval · python-louvain
 ```
 
-#### Multi-Hop Reasoning Agent
+#### ✅ Multi-Hop Reasoning Agent
 For questions requiring chained inference, implement a ReAct loop over the knowledge graph: *Thought → retrieve nodes → Act → traverse relations → Observe → synthesize*. Each hop enriches the context window. Stops when confidence exceeds 0.85 or after a configurable max-hop limit.
 ```
 Tech: LangGraph ReAct · Neo4j traversal · confidence scoring · agents/multi_hop.py

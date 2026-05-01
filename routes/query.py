@@ -18,6 +18,7 @@ from retrieval.hybrid_retriever import hybrid_retriever
 from retrieval.reranker import cohere_reranker # Reranker still works but uses Cohere. If user wants ONLY Gemini, I should update this too.
 from agents.adaptive_router import adaptive_router
 from agents.crag import crag_agent
+from agents.graph_reasoner import graph_reasoner
 
 router = APIRouter()
 
@@ -74,8 +75,9 @@ class RAGStreamer:
         self._end_step("adaptive_router")
 
         # New: Direct routing for multi-hop
-        if route_config.get("category") == "multi_hop":
-            yield f"data: {json.dumps({'type': 'thought', 'reasoning': 'Complex multi-hop query detected. Engaging GraphReasoningAgent...', 'step': 0})}\n\n"
+        if self.request.use_reasoning or route_config.get("category") == "multi_hop":
+            reasoning_msg = "Forcing multi-hop reasoning as requested..." if self.request.use_reasoning else "Complex multi-hop query detected. Engaging GraphReasoningAgent..."
+            yield f"data: {json.dumps({'type': 'thought', 'reasoning': reasoning_msg, 'step': 0})}\n\n"
             async for event in graph_reasoner.run(rewritten_query, self.request.session_id):
                 if event["type"] in ["thought", "observation"]:
                     yield f"data: {json.dumps(event)}\n\n"
