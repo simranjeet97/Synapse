@@ -60,12 +60,16 @@ class ChromaDB_client:
         # Also handle enterprise collection if it exists and contains these docs
         try:
             ent_collection = shard_manager.get_enterprise_collection()
-            # We don't know if doc is in enterprise, but update won't fail if IDs aren't found usually
-            # Actually Chroma update errors if ID is missing. We should check or catch.
-            # For this job, we assume doc is in shards.
-            pass
-        except Exception:
-            pass
+            if ent_collection:
+                # Find which IDs actually exist in the enterprise collection to avoid update errors
+                existing = ent_collection.get(ids=all_chunk_ids, include=[])
+                existing_ids = existing.get("ids", [])
+                
+                if existing_ids:
+                    metadatas = [payload for _ in existing_ids]
+                    ent_collection.update(ids=existing_ids, metadatas=metadatas)
+        except Exception as e:
+            logger.error(f"Failed to update enterprise collection: {e}")
 
 def run_pagerank_job():
     start_time = time.time()
@@ -163,10 +167,17 @@ def run_pagerank_job():
 
     # Send to OPIK
     try:
-        opik = Opik()
-        # opik.log_metrics(...) - Assuming Opik client usage based on common patterns
-        # For now, we log a simple event if Opik is configured
-        pass
+        opik_client = Opik()
+        trace = opik_client.trace(name="pagerank_computation")
+        trace.update(
+            metadata={
+                "total_nodes": G.number_of_nodes(),
+                "total_edges": G.number_of_edges(),
+                "duration_seconds": duration,
+                "top_10_nodes": [doc_id for doc_id, _ in top_10]
+            }
+        )
+        logger.info("Successfully logged PageRank metrics to Opik")
     except Exception as e:
         logger.error(f"Failed to send metrics to OPIK: {e}")
 
