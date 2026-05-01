@@ -32,6 +32,11 @@ dependencies = [
     "celery",
     "scipy",
     "numpy",
+    "neo4j",
+    "transformers",
+    "torch",
+    "spacy-transformers",
+    "openai",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +46,7 @@ dev = [
     "black",
     "isort",
     "mypy",
+    "testcontainers[neo4j]",
 ]
 
 [build-system]

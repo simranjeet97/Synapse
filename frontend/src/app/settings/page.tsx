@@ -1,24 +1,64 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Brain, Database, Zap, Save } from "lucide-react";
+import { Shield, Brain, Database, Save } from "lucide-react";
 import { toast } from "sonner";
 
 export default function SettingsPage() {
   const [chunkSize, setChunkSize] = useState([512]);
   const [topK, setTopK] = useState([5]);
   const [model, setModel] = useState("gemini-3-flash");
+  
+  const [inputGuard, setInputGuard] = useState(true);
+  const [contentFilter, setContentFilter] = useState(true);
+  const [outputGuard, setOutputGuard] = useState(true);
+  const [showTrace, setShowTrace] = useState(true);
+  
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setTimeout(() => {
+      setIsMounted(true);
+      const saved = localStorage.getItem("rag_settings");
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed.chunkSize) setChunkSize(parsed.chunkSize);
+          if (parsed.topK) setTopK(parsed.topK);
+          if (parsed.model) setModel(parsed.model);
+          if (typeof parsed.inputGuard === 'boolean') setInputGuard(parsed.inputGuard);
+          if (typeof parsed.contentFilter === 'boolean') setContentFilter(parsed.contentFilter);
+          if (typeof parsed.outputGuard === 'boolean') setOutputGuard(parsed.outputGuard);
+          if (typeof parsed.showTrace === 'boolean') setShowTrace(parsed.showTrace);
+        } catch (e) {
+          console.error("Failed to parse settings", e);
+        }
+      }
+    }, 0);
+  }, []);
 
   const handleSave = () => {
+    const settings = {
+      chunkSize,
+      topK,
+      model,
+      inputGuard,
+      contentFilter,
+      outputGuard,
+      showTrace
+    };
+    localStorage.setItem("rag_settings", JSON.stringify(settings));
     toast.success("Settings saved successfully");
   };
+
+  if (!isMounted) return null;
 
   return (
     <div className="max-w-4xl mx-auto p-8 space-y-8">
@@ -85,7 +125,7 @@ export default function SettingsPage() {
                   <Label>Input Guard</Label>
                   <p className="text-[10px] text-muted-foreground">Prompt injection & SQLi detection.</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch checked={inputGuard} onCheckedChange={setInputGuard} />
              </div>
              <Separator />
              <div className="flex items-center justify-between">
@@ -93,7 +133,7 @@ export default function SettingsPage() {
                   <Label>Content Filter</Label>
                   <p className="text-[10px] text-muted-foreground">Validate retrieved document domain & relevance.</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch checked={contentFilter} onCheckedChange={setContentFilter} />
              </div>
              <Separator />
              <div className="flex items-center justify-between">
@@ -101,7 +141,15 @@ export default function SettingsPage() {
                   <Label>Output Guard</Label>
                   <p className="text-[10px] text-muted-foreground">PII redaction using Presidio.</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch checked={outputGuard} onCheckedChange={setOutputGuard} />
+             </div>
+             <Separator />
+             <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Show Reasoning Trace</Label>
+                  <p className="text-[10px] text-muted-foreground">Display agent&apos;s multi-hop thinking process.</p>
+                </div>
+                <Switch checked={showTrace} onCheckedChange={setShowTrace} />
              </div>
           </CardContent>
         </Card>

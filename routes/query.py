@@ -73,6 +73,23 @@ class RAGStreamer:
         route_config = await adaptive_router.classify_and_route(rewritten_query)
         self._end_step("adaptive_router")
 
+        # New: Direct routing for multi-hop
+        if route_config.get("category") == "multi_hop":
+            yield f"data: {json.dumps({'type': 'thought', 'reasoning': 'Complex multi-hop query detected. Engaging GraphReasoningAgent...', 'step': 0})}\n\n"
+            async for event in graph_reasoner.run(rewritten_query, self.request.session_id):
+                if event["type"] in ["thought", "observation"]:
+                    yield f"data: {json.dumps(event)}\n\n"
+                elif event["type"] == "answer_token":
+                    token = event["token"]
+                    self.full_answer += token
+                    yield f"data: {json.dumps({'token': token, 'done': False})}\n\n"
+                elif event["type"] == "trace":
+                    self.sources = [SearchResult(content=f"Step {o.step} - {o.tool}: {str(o.result)[:200]}...", metadata={}, score=1.0) for o in event["trace"].observations]
+                    yield f"data: {json.dumps(event)}\n\n"
+            
+            yield await self._final_event()
+            return
+
         # 5. Retrieval & Reranking
         self._start_step()
         raw_results = await hybrid_retriever.search(
@@ -110,6 +127,23 @@ class RAGStreamer:
         
         if hasattr(agent_res, "message"): # RefusalResponse
              yield f"data: {json.dumps({'token': agent_res.message, 'done': True})}\n\n"
+             return
+
+        # New: Ambiguous path escalation
+        if hasattr(agent_res, "path") and agent_res.path == "ambiguous":
+             yield f"data: {json.dumps({'type': 'thought', 'reasoning': 'Retrieval ambiguous. Escalating to GraphReasoningAgent...', 'step': 0})}\n\n"
+             async for event in graph_reasoner.run(rewritten_query, self.request.session_id):
+                if event["type"] in ["thought", "observation"]:
+                    yield f"data: {json.dumps(event)}\n\n"
+                elif event["type"] == "answer_token":
+                    token = event["token"]
+                    self.full_answer += token
+                    yield f"data: {json.dumps({'token': token, 'done': False})}\n\n"
+                elif event["type"] == "trace":
+                    self.sources = agent_res.documents # Combine sources
+                    yield f"data: {json.dumps(event)}\n\n"
+             
+             yield await self._final_event()
              return
              
         self.sources = agent_res.documents

@@ -72,7 +72,7 @@ export function SourcePanel({ sources }: SourcePanelProps) {
                         />
                       </div>
                       <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-3 italic">
-                        "...{source.content.slice(0, 150)}..."
+                        &quot;...{source.content.slice(0, 150)}...&quot;
                       </p>
                       <div className="flex flex-wrap gap-1">
                         {source.metadata.source_type && (

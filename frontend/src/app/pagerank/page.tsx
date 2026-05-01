@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Network, ArrowRight, Share2, TrendingUp, Info } from "lucide-react";
+import { Network, Share2, TrendingUp, Info } from "lucide-react";
+import { api } from "@/lib/api";
+import { toast } from "sonner";
 
 export default function PageRankPage() {
   const [isComputing, setIsComputing] = useState(false);
@@ -21,9 +22,17 @@ export default function PageRankPage() {
     ]
   };
 
-  const handleCompute = () => {
+  const handleCompute = async () => {
     setIsComputing(true);
-    setTimeout(() => setIsComputing(false), 2000);
+    try {
+      await api.triggerPageRank();
+      toast.success("PageRank computation queued successfully!");
+    } catch (error) {
+      toast.error("Failed to trigger PageRank job.");
+      console.error(error);
+    } finally {
+      setIsComputing(false);
+    }
   };
 
   return (
@@ -127,7 +136,7 @@ export default function PageRankPage() {
                 <div>
                   <h4 className="text-sm font-bold">Normalisation</h4>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    URLs are canonicalized (stripping query params) to ensure authority isn't fragmented 
+                    URLs are canonicalized (stripping query params) to ensure authority isn&apos;t fragmented 
                     across tracking links.
                   </p>
                 </div>
@@ -138,7 +147,7 @@ export default function PageRankPage() {
               <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">Edge Storage (Redis)</h4>
               <code className="text-[10px] block font-mono text-primary">
                 ZADD citations:doc_1 1.0 https://google.com<br/>
-                RPUSH citation_graph:edges "doc_1,https://google.com,1.0"
+                RPUSH citation_graph:edges &quot;doc_1,https://google.com,1.0&quot;
               </code>
             </div>
           </CardContent>

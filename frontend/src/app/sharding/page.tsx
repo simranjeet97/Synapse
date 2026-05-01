@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { ChatInterface } from "@/components/chat-interface";
 import { SourcePanel } from "@/components/source-panel";
 import { Message, SearchResult } from "@/lib/types";

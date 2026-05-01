@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Upload, File, CheckCircle, Loader2, X } from "lucide-react";
+import { Upload, File, CheckCircle, Loader2, X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 type UploadStatus = "idle" | "uploading" | "extracting" | "chunking" | "embedding" | "indexed";
 
@@ -19,6 +20,7 @@ interface UploadFile {
 }
 
 export default function UploadPage() {
+  const router = useRouter();
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [selectedSystem, setSelectedSystem] = useState<"enterprise" | "sharding">("enterprise");
 
@@ -60,10 +62,10 @@ export default function UploadPage() {
       await new Promise(r => setTimeout(r, 1000));
       updateStatus("embedding", 80);
       
-      const res = await api.upload(fileObj.file, selectedSystem === "sharding");
+      await api.upload(fileObj.file, selectedSystem === "sharding");
       updateStatus("indexed", 100);
       toast.success(`${fileObj.file.name} indexed successfully`);
-    } catch (error) {
+    } catch {
       toast.error(`Failed to upload ${fileObj.file.name}`);
       updateStatus("idle", 0);
     }
@@ -153,7 +155,12 @@ export default function UploadPage() {
                         </Button>
                       </>
                     ) : file.status === "indexed" ? (
-                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-green-500" />
+                        <Button size="sm" variant="outline" onClick={() => router.push(`/search?q=${encodeURIComponent(file.file.name)}`)}>
+                          <Search className="w-4 h-4 mr-1" /> Debug
+                        </Button>
+                      </div>
                     ) : (
                       <Loader2 className="w-5 h-5 animate-spin text-primary" />
                     )}

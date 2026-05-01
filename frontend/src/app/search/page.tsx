@@ -1,27 +1,68 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { SearchResult } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, Loader2, Info } from "lucide-react";
+import { Search, Loader2, Info, Building2, Layers, Network } from "lucide-react";
 
-export default function SearchPage() {
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+function SearchPageContent() {
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get("q") || "";
+  
+  const [query, setQuery] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
-  const [useSharding, setUseSharding] = useState(true);
-  const [authorityMode, setAuthorityMode] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  
+  const [results, setResults] = useState<{
+    enterprise: SearchResult[];
+    sharding: SearchResult[];
+    pageRank: SearchResult[];
+  }>({
+    enterprise: [],
+    sharding: [],
+    pageRank: []
+  });
+  
+  const [latencies, setLatencies] = useState({
+    enterprise: 0,
+    sharding: 0,
+    pageRank: 0
+  });
 
-  const handleSearch = async () => {
-    if (!query) return;
+  const handleSearch = async (overrideQuery?: string) => {
+    const q = overrideQuery || query;
+    if (!q) return;
     setLoading(true);
+    setHasSearched(true);
+    
     try {
-      const res = await api.search(query, 10, useSharding, { authority_mode: authorityMode });
-      setResults(res.results);
+      const measure = async (promise: Promise<{ results: SearchResult[] }>) => {
+        const start = performance.now();
+        const result = await promise;
+        return { result, latency: performance.now() - start };
+      };
+
+      const [ent, shard, pr] = await Promise.all([
+        measure(api.search(q, 5, false, { authority_mode: false })),
+        measure(api.search(q, 5, true, { authority_mode: false })),
+        measure(api.search(q, 5, false, { authority_mode: true }))
+      ]);
+
+      setResults({
+        enterprise: ent.result.results,
+        sharding: shard.result.results,
+        pageRank: pr.result.results
+      });
+      
+      setLatencies({
+        enterprise: ent.latency,
+        sharding: shard.latency,
+        pageRank: pr.latency
+      });
     } catch (error) {
       console.error(error);
     } finally {
@@ -29,11 +70,38 @@ export default function SearchPage() {
     }
   };
 
+  useEffect(() => {
+    if (initialQuery) {
+      setTimeout(() => {
+        handleSearch(initialQuery);
+      }, 0);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
+
+  const ResultCard = ({ res }: { res: SearchResult }) => (
+    <div className="p-4 bg-muted/30 rounded-xl border hover:border-primary/50 transition-colors text-left space-y-3">
+      <p className="text-xs leading-relaxed italic text-muted-foreground line-clamp-3">
+        &quot;{res.content}&quot;
+      </p>
+      <div className="grid grid-cols-2 gap-2 text-[10px] font-mono">
+        <div>Dense: <span className="text-primary">{res.dense_score?.toFixed(4) || "0.0000"}</span></div>
+        <div>RRF: <span className="text-primary">{res.rrf_score?.toFixed(4) || "0.0000"}</span></div>
+        <div>PageRank: <span className="text-primary">{res.pagerank_score?.toFixed(4) || "0.0000"}</span></div>
+        <div>Boosted: <span className="text-primary font-bold">{res.boosted_score?.toFixed(4) || "0.0000"}</span></div>
+      </div>
+      <div className="flex gap-1 pt-1">
+        <Badge variant="outline" className="text-[9px]">{res.metadata.filename as string || "unknown"}</Badge>
+        <Badge variant="secondary" className="text-[9px]">P{res.metadata.page as number || 1}</Badge>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="max-w-6xl mx-auto p-8 space-y-8">
+    <div className="max-w-7xl mx-auto p-8 space-y-8 h-screen overflow-y-auto">
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">Retrieval Debugger</h1>
-        <p className="text-muted-foreground">Inspect raw scores across dense, sparse, RRF, and PageRank stages.</p>
+        <h1 className="text-3xl font-bold">3-Way RAG Comparison</h1>
+        <p className="text-muted-foreground">Compare retrieval accuracy and latency across Enterprise, Multi-Tenant, and Authority Boosted modes.</p>
       </div>
 
       <div className="flex gap-4">
@@ -43,110 +111,83 @@ export default function SearchPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="Enter search query..." 
-            className="pl-10"
+            placeholder="Enter search query or document name..." 
+            className="pl-10 h-12"
           />
         </div>
-        <Button onClick={handleSearch} disabled={loading}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Run Retrieval"}
+        <Button onClick={() => handleSearch()} disabled={loading} className="h-12 px-8">
+          {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Search className="w-4 h-4 mr-2" />}
+          Run Comparison
         </Button>
       </div>
 
-      <div className="flex items-center gap-6 p-4 bg-muted/30 rounded-xl border border-dashed">
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase text-muted-foreground">Architecture</span>
-            <div className="flex items-center gap-2">
-              <Button 
-                size="sm" 
-                variant={!useSharding ? "default" : "outline"}
-                onClick={() => setUseSharding(false)}
-                className="text-[10px] h-7"
-              >
-                Enterprise
-              </Button>
-              <Button 
-                size="sm" 
-                variant={useSharding ? "default" : "outline"}
-                onClick={() => setUseSharding(true)}
-                className="text-[10px] h-7"
-              >
-                Multi-Tenant
-              </Button>
+      {!hasSearched ? (
+        <div className="h-64 flex flex-col items-center justify-center text-muted-foreground border-2 border-dashed rounded-3xl">
+          <Info className="w-8 h-8 mb-4 opacity-50" />
+          <p>Run a query to benchmark the RAG architectures.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-20">
+          {/* Column 1: Enterprise */}
+          <div className="space-y-4">
+            <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold flex items-center gap-2 text-blue-600">
+                  <Building2 className="w-4 h-4" /> Enterprise RAG
+                </h3>
+                <span className="text-xs font-mono bg-blue-500/20 px-2 py-1 rounded text-blue-700">{latencies.enterprise.toFixed(0)}ms</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Standard single collection retrieval.</p>
+            </div>
+            <div className="space-y-3">
+              {results.enterprise.map((res, i) => <ResultCard key={`ent-${i}`} res={res} />)}
+              {results.enterprise.length === 0 && !loading && <div className="text-xs text-center p-4 text-muted-foreground">No results found.</div>}
             </div>
           </div>
-          
-          <div className="w-px h-8 bg-border" />
 
-          <div className="flex flex-col gap-1">
-            <span className="text-[10px] font-bold uppercase text-muted-foreground">Ranking Mode</span>
-            <div className="flex items-center gap-2">
-              <Button 
-                size="sm" 
-                variant={!authorityMode ? "default" : "outline"}
-                onClick={() => setAuthorityMode(false)}
-                className="text-[10px] h-7"
-              >
-                Standard
-              </Button>
-              <Button 
-                size="sm" 
-                variant={authorityMode ? "secondary" : "outline"}
-                onClick={() => setAuthorityMode(true)}
-                className="text-[10px] h-7"
-              >
-                Authority Boost
-              </Button>
+          {/* Column 2: Sharding */}
+          <div className="space-y-4">
+            <div className="p-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold flex items-center gap-2 text-orange-600">
+                  <Layers className="w-4 h-4" /> Multi-Tenant
+                </h3>
+                <span className="text-xs font-mono bg-orange-500/20 px-2 py-1 rounded text-orange-700">{latencies.sharding.toFixed(0)}ms</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">16x Chroma Sharding architecture.</p>
+            </div>
+            <div className="space-y-3">
+              {results.sharding.map((res, i) => <ResultCard key={`shard-${i}`} res={res} />)}
+              {results.sharding.length === 0 && !loading && <div className="text-xs text-center p-4 text-muted-foreground">No results found.</div>}
+            </div>
+          </div>
+
+          {/* Column 3: PageRank */}
+          <div className="space-y-4">
+            <div className="p-4 bg-green-500/10 border border-green-500/20 rounded-2xl">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold flex items-center gap-2 text-green-600">
+                  <Network className="w-4 h-4" /> PageRank Boost
+                </h3>
+                <span className="text-xs font-mono bg-green-500/20 px-2 py-1 rounded text-green-700">{latencies.pageRank.toFixed(0)}ms</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">Graph-based authority normalization.</p>
+            </div>
+            <div className="space-y-3">
+              {results.pageRank.map((res, i) => <ResultCard key={`pr-${i}`} res={res} />)}
+              {results.pageRank.length === 0 && !loading && <div className="text-xs text-center p-4 text-muted-foreground">No results found.</div>}
             </div>
           </div>
         </div>
-        
-        <p className="text-[11px] text-muted-foreground italic flex-1">
-          {authorityMode 
-            ? "Authority mode increases PageRank influence (Alpha 0.6) for high-credibility retrieval." 
-            : "Using standard PageRank influence (Alpha 0.3)."}
-        </p>
-      </div>
-
-      <div className="overflow-x-auto border rounded-xl bg-background shadow-sm">
-        <table className="w-full text-sm text-left">
-          <thead className="bg-muted/50 text-muted-foreground font-medium border-b text-[11px] uppercase tracking-wider">
-            <tr>
-              <th className="px-4 py-3">Content Snippet</th>
-              <th className="px-4 py-3">Dense</th>
-              <th className="px-4 py-3">RRF</th>
-              <th className="px-4 py-3">PageRank</th>
-              <th className="px-4 py-3">Boosted</th>
-              <th className="px-4 py-3">Metadata</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {results.map((res, i) => (
-              <tr key={res.id || i} className="hover:bg-muted/30 transition-colors">
-                <td className="px-4 py-4 max-w-xs">
-                  <p className="line-clamp-2 text-xs italic">"{res.content}"</p>
-                </td>
-                <td className="px-4 py-4 font-mono text-[10px]">{res.dense_score?.toFixed(4) || "0.0000"}</td>
-                <td className="px-4 py-4 font-mono text-[10px]">{res.rrf_score?.toFixed(4) || "0.0000"}</td>
-                <td className="px-4 py-4 font-mono text-[10px] text-blue-600 font-semibold">{res.pagerank_score?.toFixed(4) || "0.0000"}</td>
-                <td className="px-4 py-4 font-mono text-xs font-bold text-primary">{res.boosted_score?.toFixed(4) || "0.0000"}</td>
-                <td className="px-4 py-4 space-x-1">
-                  <Badge variant="outline" className="text-[9px]">{res.metadata.filename}</Badge>
-                  <Badge variant="outline" className="text-[9px]">P{res.metadata.page}</Badge>
-                </td>
-              </tr>
-            ))}
-            {results.length === 0 && !loading && (
-              <tr>
-                <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
-                  <Info className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                  No results yet. Try a query.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      )}
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></div>}>
+      <SearchPageContent />
+    </Suspense>
   );
 }

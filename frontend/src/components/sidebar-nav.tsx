@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { MessageSquare, Upload, Search, Settings, Bot, Terminal } from "lucide-react";
 
@@ -16,6 +18,29 @@ const navItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const [healthStatus, setHealthStatus] = useState<{status: string, [key: string]: unknown} | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchHealth = async () => {
+      try {
+        const res = await api.health();
+        if (mounted) setHealthStatus(res);
+      } catch {
+        if (mounted) setHealthStatus({ status: "unhealthy", error: true });
+      }
+    };
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 30000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const isHealthy = healthStatus?.status === "healthy";
+  const statusColor = !healthStatus ? "bg-amber-500" : isHealthy ? "bg-green-500" : "bg-red-500";
+  const statusText = !healthStatus ? "Checking services..." : isHealthy ? "All services operational. GPU inference ready." : "System performance degraded. Some services offline.";
 
   return (
     <aside className="w-16 md:w-64 border-r border-border bg-background flex flex-col transition-all duration-300">
@@ -53,11 +78,11 @@ export function SidebarNav() {
       <div className="p-4 border-t border-border mt-auto">
         <div className="bg-muted/50 rounded-2xl p-4 hidden md:block">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+            <div className={cn("w-2 h-2 rounded-full animate-pulse", statusColor)} />
             <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">System Status</span>
           </div>
           <p className="text-[11px] text-muted-foreground leading-relaxed">
-            All services operational. GPU inference ready.
+            {statusText}
           </p>
         </div>
       </div>

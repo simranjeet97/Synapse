@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { ScrollArea } from "./ui/scroll-area";
 import { MessageItem } from "./message-item";
-import { Send, PanelRight, Bot, User } from "lucide-react";
+import { Send, PanelRight, Bot } from "lucide-react";
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -52,7 +52,7 @@ export function ChatInterface({ messages, onSendMessage, isLoading, onToggleSide
               <Bot className="w-16 h-16 text-muted-foreground/20" />
               <h2 className="text-2xl font-bold text-muted-foreground">How can I help you today?</h2>
               <p className="text-muted-foreground max-w-sm">
-                Ask me anything about your uploaded documents. I'll provide cited answers with real-time sources.
+                Ask me anything about your uploaded documents. I&apos;ll provide cited answers with real-time sources.
               </p>
             </div>
           )}

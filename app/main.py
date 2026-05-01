@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config import settings
-from routes import query, search, health
+from routes import query, search, health, pagerank
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,6 +37,7 @@ app.include_router(query.router, prefix=settings.API_V1_STR + "/query", tags=["Q
 app.include_router(search.router, prefix=settings.API_V1_STR + "/search", tags=["Search"])
 from routes import ingest
 app.include_router(ingest.router, prefix=settings.API_V1_STR + "/ingest", tags=["Ingest"])
+app.include_router(pagerank.router, prefix=settings.API_V1_STR + "/pagerank", tags=["PageRank"])
 
 @app.get("/")
 async def root():

@@ -100,3 +100,65 @@ class HealthCheck(BaseModel):
 class ErrorResponse(BaseModel):
     detail: str
     error_code: Optional[str] = None
+
+# --- Graph Models ---
+
+class EntityNode(BaseModel):
+    id: str
+    name: str
+    type: str
+    aliases: List[str] = []
+    doc_ids: List[str] = []
+    embedding: Optional[List[float]] = None
+
+class RelationEdge(BaseModel):
+    source_id: str
+    target_id: str
+    relation: str
+    confidence: float = 1.0
+    doc_id: Optional[str] = None
+    sentence: Optional[str] = None
+
+class NeighborResult(BaseModel):
+    entity: EntityNode
+    relation: str
+    confidence: float
+
+class PathStep(BaseModel):
+    entity: EntityNode
+    relation: Optional[str] = None
+    direction: Optional[str] = None # 'out' | 'in'
+
+class EntityContext(BaseModel):
+    entity: EntityNode
+    relations: List[NeighborResult]
+    top_docs: List[Dict[str, Any]]
+
+# --- ReAct Agent Models ---
+from dataclasses import dataclass, field
+
+@dataclass
+class Thought:
+    step: int
+    reasoning: str          # agent's internal reasoning text
+    action: str             # chosen tool name
+    action_input: dict      # tool arguments
+    confidence: float       # agent's self-assessed confidence 0.0–1.0
+
+@dataclass  
+class Observation:
+    step: int
+    tool: str
+    result: Any
+    result_confidence: float  # confidence of the tool result itself
+    latency_ms: float
+
+@dataclass
+class ReActTrace:
+    query: str
+    thoughts: List[Thought]
+    observations: List[Observation]
+    final_answer: str
+    final_confidence: float
+    hops: int
+    stopped_reason: str  # 'confidence_threshold' | 'max_hops' | 'no_new_info' | 'refusal'

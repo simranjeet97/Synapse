@@ -17,7 +17,7 @@ class IngestionPipeline:
     def __init__(self):
         self.mime = magic.Magic(mime=True)
 
-    async def process_file(self, file_path: str, use_sharding: bool = True):
+    async def process_file(self, file_path: str, use_sharding: bool = True, skip_graph: bool = False):
         print(f"Starting ingestion for: {file_path}")
         
         # 1. Detect MIME Type
@@ -39,8 +39,6 @@ class IngestionPipeline:
             content = text_extractor.extract(file_path)
             
         # 3. Preprocess
-        # For simplicity, we treat the whole content as one "page" for now
-        # In a real system, extractors would return a List[str] of pages
         pages = [content]
         clean_pages = preprocessor.strip_headers_footers(pages)
         full_content = "\n".join([preprocessor.normalize(p) for p in clean_pages])
@@ -58,8 +56,37 @@ class IngestionPipeline:
         from .citation_extractor import citation_extractor
         edges = citation_extractor.extract(file_path, full_content, {"file_path": file_path})
         await citation_extractor.store_edges(edges)
+
+        # 5c. Knowledge Graph Relation Extraction
+        if not skip_graph:
+            print("Starting Relation Extraction...")
+            from .relation_extractor import get_relation_extractor
+            from retrieval.graph_store import graph_store
+            extractor = await get_relation_extractor()
+            
+            all_entities = {}
+            all_relations = []
+            
+            for chunk_text in chunk_texts:
+                entities, relations = await extractor.extract(chunk_text, file_path)
+                for ent in entities:
+                    all_entities[ent.id] = ent
+                all_relations.extend(relations)
+            
+            # Embed entities
+            if all_entities:
+                entity_list = list(all_entities.values())
+                entity_texts = [f"{e.name} {e.type}" for e in entity_list]
+                entity_embeddings = embedder.embed_batches(entity_texts)
+                for ent, emb in zip(entity_list, entity_embeddings):
+                    ent.embedding = emb.tolist()
+                
+                # Batch upsert to Neo4j
+                await graph_store.connect()
+                await graph_store.upsert_all(entity_list, all_relations)
+                print(f"Graph updated: {len(entity_list)} entities, {len(all_relations)} relations.")
         
-        # 6. Embed (Dense)
+        # 6. Embed (Dense Chunks)
         vectors = embedder.embed_batches(chunk_texts)
         
         # 7. Create Chunk objects and Index (Chroma)
@@ -95,3 +122,16 @@ class IngestionPipeline:
         print(f"Ingestion complete for: {file_path}")
 
 ingest_pipeline = IngestionPipeline()
+
+if __name__ == "__main__":
+    import argparse
+    import asyncio
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("file", help="File to ingest")
+    parser.add_argument("--skip-graph", action="store_true", help="Skip graph extraction")
+    parser.add_argument("--no-sharding", action="store_false", dest="use_sharding", help="Disable sharding")
+    parser.set_defaults(use_sharding=True)
+    args = parser.parse_args()
+    
+    asyncio.run(ingest_pipeline.process_file(args.file, use_sharding=args.use_sharding, skip_graph=args.skip_graph))

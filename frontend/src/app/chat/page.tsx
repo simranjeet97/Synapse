@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { ChatInterface } from "@/components/chat-interface";
 import { SourcePanel } from "@/components/source-panel";
-import { Message, SearchResult } from "@/lib/types";
+import { Message, SearchResult, TraceStep } from "@/lib/types";
 import { streamQuery } from "@/lib/api";
 import { v4 as uuidv4 } from "uuid";
 
@@ -27,6 +27,7 @@ export default function ChatPage() {
 
     const assistantMsgId = uuidv4();
     let currentContent = "";
+    const reasoningSteps: TraceStep[] = [];
     
     try {
       const stream = streamQuery({
@@ -37,6 +38,37 @@ export default function ChatPage() {
       });
 
       for await (const chunk of stream) {
+        if (chunk.type === "thought" || chunk.type === "observation") {
+          reasoningSteps.push(chunk);
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.id === assistantMsgId) {
+              return [...prev.slice(0, -1), { ...last, reasoningTrace: [...reasoningSteps] }];
+            } else {
+              return [
+                ...prev,
+                {
+                  id: assistantMsgId,
+                  role: "assistant",
+                  content: "",
+                  reasoningTrace: [...reasoningSteps],
+                  timestamp: new Date().toISOString(),
+                },
+              ];
+            }
+          });
+        }
+
+        if (chunk.type === "trace") {
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last?.id === assistantMsgId) {
+              return [...prev.slice(0, -1), { ...last, finalTrace: chunk.trace }];
+            }
+            return prev;
+          });
+        }
+
         if (chunk.token) {
           currentContent += chunk.token;
           setMessages((prev) => {

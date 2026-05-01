@@ -8,6 +8,7 @@ import { Bot, User, Copy, RotateCcw, ThumbsUp, ThumbsDown, Check } from "lucide-
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
+import { ReasoningTrace } from "./ReasoningTrace";
 
 interface MessageItemProps {
   message: Message;
@@ -68,10 +69,17 @@ export function MessageItem({ message }: MessageItemProps) {
           {isAssistant ? (
              <div className="prose prose-sm dark:prose-invert max-w-none">
                 {renderContent(message.content)}
-                {isAssistant && message.content === "" && (
+                {isAssistant && message.content === "" && !message.reasoningTrace && (
                   <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />
                 )}
-             </div>
+                {isAssistant && message.reasoningTrace && (
+                  <ReasoningTrace 
+                    steps={message.reasoningTrace} 
+                    finalTrace={message.finalTrace}
+                    isReasoning={!message.finalTrace} 
+                  />
+                )}
+              </div>
           ) : (
             message.content
           )}
